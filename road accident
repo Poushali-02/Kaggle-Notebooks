@@ -1,1 +1,2358 @@
-{"metadata":{"kernelspec":{"language":"python","display_name":"Python 3","name":"python3"},"language_info":{"name":"python","version":"3.11.13","mimetype":"text/x-python","codemirror_mode":{"name":"ipython","version":3},"pygments_lexer":"ipython3","nbconvert_exporter":"python","file_extension":".py"},"kaggle":{"accelerator":"nvidiaTeslaT4","dataSources":[{"sourceId":91721,"databundleVersionId":13760552,"sourceType":"competition"}],"dockerImageVersionId":31090,"isInternetEnabled":true,"language":"python","sourceType":"notebook","isGpuEnabled":true}},"nbformat_minor":4,"nbformat":4,"cells":[{"cell_type":"code","source":"import numpy as np\nimport pandas as pd\nimport seaborn as sns\nimport matplotlib.pyplot as plt\nimport tensorflow as tf\nfrom tensorflow.keras.models import Sequential\nfrom tensorflow.keras.layers import Dense, Dropout, Flatten\nfrom tensorflow.keras.callbacks import EarlyStopping","metadata":{"_uuid":"8f2839f25d086af736a60e9eeb907d3b93b6e0e5","_cell_guid":"b1076dfc-b9ad-4769-8c92-a6c4dae69d19","trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:46:59.095191Z","iopub.execute_input":"2025-10-12T15:46:59.095397Z","iopub.status.idle":"2025-10-12T15:47:14.195218Z","shell.execute_reply.started":"2025-10-12T15:46:59.095380Z","shell.execute_reply":"2025-10-12T15:47:14.194458Z"}},"outputs":[{"name":"stderr","text":"2025-10-12 15:47:03.258674: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered\nWARNING: All log messages before absl::InitializeLog() is called are written to STDERR\nE0000 00:00:1760284023.464486      36 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered\nE0000 00:00:1760284023.536595      36 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered\n","output_type":"stream"}],"execution_count":1},{"cell_type":"code","source":"train = pd.read_csv(\"/kaggle/input/playground-series-s5e10/train.csv\")\ntest = pd.read_csv(\"/kaggle/input/playground-series-s5e10/test.csv\")\ntrain.head()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:14.196669Z","iopub.execute_input":"2025-10-12T15:47:14.197161Z","iopub.status.idle":"2025-10-12T15:47:15.408937Z","shell.execute_reply.started":"2025-10-12T15:47:14.197142Z","shell.execute_reply":"2025-10-12T15:47:15.408170Z"}},"outputs":[{"execution_count":2,"output_type":"execute_result","data":{"text/plain":"   id road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n0   0     urban          2       0.06           35  daylight   rainy   \n1   1     urban          4       0.99           35  daylight   clear   \n2   2     rural          4       0.63           70       dim   clear   \n3   3   highway          4       0.07           35       dim   rainy   \n4   4     rural          1       0.58           60  daylight   foggy   \n\n   road_signs_present  public_road time_of_day  holiday  school_season  \\\n0               False         True   afternoon    False           True   \n1                True        False     evening     True           True   \n2               False         True     morning     True          False   \n3                True         True     morning    False          False   \n4               False        False     evening     True          False   \n\n   num_reported_accidents  accident_risk  \n0                       1           0.13  \n1                       0           0.35  \n2                       2           0.30  \n3                       1           0.21  \n4                       1           0.56  ","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>id</th>\n      <th>road_type</th>\n      <th>num_lanes</th>\n      <th>curvature</th>\n      <th>speed_limit</th>\n      <th>lighting</th>\n      <th>weather</th>\n      <th>road_signs_present</th>\n      <th>public_road</th>\n      <th>time_of_day</th>\n      <th>holiday</th>\n      <th>school_season</th>\n      <th>num_reported_accidents</th>\n      <th>accident_risk</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>0</th>\n      <td>0</td>\n      <td>urban</td>\n      <td>2</td>\n      <td>0.06</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>rainy</td>\n      <td>False</td>\n      <td>True</td>\n      <td>afternoon</td>\n      <td>False</td>\n      <td>True</td>\n      <td>1</td>\n      <td>0.13</td>\n    </tr>\n    <tr>\n      <th>1</th>\n      <td>1</td>\n      <td>urban</td>\n      <td>4</td>\n      <td>0.99</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>False</td>\n      <td>evening</td>\n      <td>True</td>\n      <td>True</td>\n      <td>0</td>\n      <td>0.35</td>\n    </tr>\n    <tr>\n      <th>2</th>\n      <td>2</td>\n      <td>rural</td>\n      <td>4</td>\n      <td>0.63</td>\n      <td>70</td>\n      <td>dim</td>\n      <td>clear</td>\n      <td>False</td>\n      <td>True</td>\n      <td>morning</td>\n      <td>True</td>\n      <td>False</td>\n      <td>2</td>\n      <td>0.30</td>\n    </tr>\n    <tr>\n      <th>3</th>\n      <td>3</td>\n      <td>highway</td>\n      <td>4</td>\n      <td>0.07</td>\n      <td>35</td>\n      <td>dim</td>\n      <td>rainy</td>\n      <td>True</td>\n      <td>True</td>\n      <td>morning</td>\n      <td>False</td>\n      <td>False</td>\n      <td>1</td>\n      <td>0.21</td>\n    </tr>\n    <tr>\n      <th>4</th>\n      <td>4</td>\n      <td>rural</td>\n      <td>1</td>\n      <td>0.58</td>\n      <td>60</td>\n      <td>daylight</td>\n      <td>foggy</td>\n      <td>False</td>\n      <td>False</td>\n      <td>evening</td>\n      <td>True</td>\n      <td>False</td>\n      <td>1</td>\n      <td>0.56</td>\n    </tr>\n  </tbody>\n</table>\n</div>"},"metadata":{}}],"execution_count":2},{"cell_type":"code","source":"test.head()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.411873Z","iopub.execute_input":"2025-10-12T15:47:15.412544Z","iopub.status.idle":"2025-10-12T15:47:15.422725Z","shell.execute_reply.started":"2025-10-12T15:47:15.412520Z","shell.execute_reply":"2025-10-12T15:47:15.422215Z"}},"outputs":[{"execution_count":3,"output_type":"execute_result","data":{"text/plain":"       id road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n0  517754   highway          2       0.34           45     night   clear   \n1  517755     urban          3       0.04           45       dim   foggy   \n2  517756     urban          2       0.59           35       dim   clear   \n3  517757     rural          4       0.95           35  daylight   rainy   \n4  517758   highway          2       0.86           35  daylight   clear   \n\n   road_signs_present  public_road time_of_day  holiday  school_season  \\\n0                True         True   afternoon     True           True   \n1                True        False   afternoon     True          False   \n2                True        False   afternoon     True           True   \n3               False        False   afternoon    False          False   \n4                True        False     evening    False           True   \n\n   num_reported_accidents  \n0                       1  \n1                       0  \n2                       1  \n3                       2  \n4                       3  ","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>id</th>\n      <th>road_type</th>\n      <th>num_lanes</th>\n      <th>curvature</th>\n      <th>speed_limit</th>\n      <th>lighting</th>\n      <th>weather</th>\n      <th>road_signs_present</th>\n      <th>public_road</th>\n      <th>time_of_day</th>\n      <th>holiday</th>\n      <th>school_season</th>\n      <th>num_reported_accidents</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>0</th>\n      <td>517754</td>\n      <td>highway</td>\n      <td>2</td>\n      <td>0.34</td>\n      <td>45</td>\n      <td>night</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>True</td>\n      <td>afternoon</td>\n      <td>True</td>\n      <td>True</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>1</th>\n      <td>517755</td>\n      <td>urban</td>\n      <td>3</td>\n      <td>0.04</td>\n      <td>45</td>\n      <td>dim</td>\n      <td>foggy</td>\n      <td>True</td>\n      <td>False</td>\n      <td>afternoon</td>\n      <td>True</td>\n      <td>False</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>2</th>\n      <td>517756</td>\n      <td>urban</td>\n      <td>2</td>\n      <td>0.59</td>\n      <td>35</td>\n      <td>dim</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>False</td>\n      <td>afternoon</td>\n      <td>True</td>\n      <td>True</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>3</th>\n      <td>517757</td>\n      <td>rural</td>\n      <td>4</td>\n      <td>0.95</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>rainy</td>\n      <td>False</td>\n      <td>False</td>\n      <td>afternoon</td>\n      <td>False</td>\n      <td>False</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>4</th>\n      <td>517758</td>\n      <td>highway</td>\n      <td>2</td>\n      <td>0.86</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>False</td>\n      <td>evening</td>\n      <td>False</td>\n      <td>True</td>\n      <td>3</td>\n    </tr>\n  </tbody>\n</table>\n</div>"},"metadata":{}}],"execution_count":3},{"cell_type":"code","source":"train.drop('id', axis=1, inplace=True)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.424727Z","iopub.execute_input":"2025-10-12T15:47:15.424919Z","iopub.status.idle":"2025-10-12T15:47:15.461462Z","shell.execute_reply.started":"2025-10-12T15:47:15.424886Z","shell.execute_reply":"2025-10-12T15:47:15.460946Z"}},"outputs":[],"execution_count":4},{"cell_type":"code","source":"test_id = test['id']\ntest.drop('id', inplace=True, axis=1)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.462073Z","iopub.execute_input":"2025-10-12T15:47:15.462240Z","iopub.status.idle":"2025-10-12T15:47:15.471039Z","shell.execute_reply.started":"2025-10-12T15:47:15.462227Z","shell.execute_reply":"2025-10-12T15:47:15.470453Z"}},"outputs":[],"execution_count":5},{"cell_type":"code","source":"train.shape","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.471753Z","iopub.execute_input":"2025-10-12T15:47:15.471944Z","iopub.status.idle":"2025-10-12T15:47:15.482879Z","shell.execute_reply.started":"2025-10-12T15:47:15.471921Z","shell.execute_reply":"2025-10-12T15:47:15.482259Z"}},"outputs":[{"execution_count":6,"output_type":"execute_result","data":{"text/plain":"(517754, 13)"},"metadata":{}}],"execution_count":6},{"cell_type":"code","source":"train.info()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.483558Z","iopub.execute_input":"2025-10-12T15:47:15.483714Z","iopub.status.idle":"2025-10-12T15:47:15.604271Z","shell.execute_reply.started":"2025-10-12T15:47:15.483701Z","shell.execute_reply":"2025-10-12T15:47:15.603476Z"}},"outputs":[{"name":"stdout","text":"<class 'pandas.core.frame.DataFrame'>\nRangeIndex: 517754 entries, 0 to 517753\nData columns (total 13 columns):\n #   Column                  Non-Null Count   Dtype  \n---  ------                  --------------   -----  \n 0   road_type               517754 non-null  object \n 1   num_lanes               517754 non-null  int64  \n 2   curvature               517754 non-null  float64\n 3   speed_limit             517754 non-null  int64  \n 4   lighting                517754 non-null  object \n 5   weather                 517754 non-null  object \n 6   road_signs_present      517754 non-null  bool   \n 7   public_road             517754 non-null  bool   \n 8   time_of_day             517754 non-null  object \n 9   holiday                 517754 non-null  bool   \n 10  school_season           517754 non-null  bool   \n 11  num_reported_accidents  517754 non-null  int64  \n 12  accident_risk           517754 non-null  float64\ndtypes: bool(4), float64(2), int64(3), object(4)\nmemory usage: 37.5+ MB\n","output_type":"stream"}],"execution_count":7},{"cell_type":"code","source":"train.describe()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.605047Z","iopub.execute_input":"2025-10-12T15:47:15.605279Z","iopub.status.idle":"2025-10-12T15:47:15.702395Z","shell.execute_reply.started":"2025-10-12T15:47:15.605255Z","shell.execute_reply":"2025-10-12T15:47:15.701723Z"}},"outputs":[{"execution_count":8,"output_type":"execute_result","data":{"text/plain":"           num_lanes      curvature    speed_limit  num_reported_accidents  \\\ncount  517754.000000  517754.000000  517754.000000           517754.000000   \nmean        2.491511       0.488719      46.112575                1.187970   \nstd         1.120434       0.272563      15.788521                0.895961   \nmin         1.000000       0.000000      25.000000                0.000000   \n25%         1.000000       0.260000      35.000000                1.000000   \n50%         2.000000       0.510000      45.000000                1.000000   \n75%         3.000000       0.710000      60.000000                2.000000   \nmax         4.000000       1.000000      70.000000                7.000000   \n\n       accident_risk  \ncount  517754.000000  \nmean        0.352377  \nstd         0.166417  \nmin         0.000000  \n25%         0.230000  \n50%         0.340000  \n75%         0.460000  \nmax         1.000000  ","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>num_lanes</th>\n      <th>curvature</th>\n      <th>speed_limit</th>\n      <th>num_reported_accidents</th>\n      <th>accident_risk</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>count</th>\n      <td>517754.000000</td>\n      <td>517754.000000</td>\n      <td>517754.000000</td>\n      <td>517754.000000</td>\n      <td>517754.000000</td>\n    </tr>\n    <tr>\n      <th>mean</th>\n      <td>2.491511</td>\n      <td>0.488719</td>\n      <td>46.112575</td>\n      <td>1.187970</td>\n      <td>0.352377</td>\n    </tr>\n    <tr>\n      <th>std</th>\n      <td>1.120434</td>\n      <td>0.272563</td>\n      <td>15.788521</td>\n      <td>0.895961</td>\n      <td>0.166417</td>\n    </tr>\n    <tr>\n      <th>min</th>\n      <td>1.000000</td>\n      <td>0.000000</td>\n      <td>25.000000</td>\n      <td>0.000000</td>\n      <td>0.000000</td>\n    </tr>\n    <tr>\n      <th>25%</th>\n      <td>1.000000</td>\n      <td>0.260000</td>\n      <td>35.000000</td>\n      <td>1.000000</td>\n      <td>0.230000</td>\n    </tr>\n    <tr>\n      <th>50%</th>\n      <td>2.000000</td>\n      <td>0.510000</td>\n      <td>45.000000</td>\n      <td>1.000000</td>\n      <td>0.340000</td>\n    </tr>\n    <tr>\n      <th>75%</th>\n      <td>3.000000</td>\n      <td>0.710000</td>\n      <td>60.000000</td>\n      <td>2.000000</td>\n      <td>0.460000</td>\n    </tr>\n    <tr>\n      <th>max</th>\n      <td>4.000000</td>\n      <td>1.000000</td>\n      <td>70.000000</td>\n      <td>7.000000</td>\n      <td>1.000000</td>\n    </tr>\n  </tbody>\n</table>\n</div>"},"metadata":{}}],"execution_count":8},{"cell_type":"code","source":"nums = []\ncats = []\n\nfor each in train.columns:\n    if train[each].dtype == 'object' or train[each].dtype == 'bool':\n        cats.append(each)\n    else:\n        nums.append(each)\n\nprint(f\"Numericals {nums}\\nCategoricals {cats}\")","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.703193Z","iopub.execute_input":"2025-10-12T15:47:15.703434Z","iopub.status.idle":"2025-10-12T15:47:15.708609Z","shell.execute_reply.started":"2025-10-12T15:47:15.703409Z","shell.execute_reply":"2025-10-12T15:47:15.707934Z"}},"outputs":[{"name":"stdout","text":"Numericals ['num_lanes', 'curvature', 'speed_limit', 'num_reported_accidents', 'accident_risk']\nCategoricals ['road_type', 'lighting', 'weather', 'road_signs_present', 'public_road', 'time_of_day', 'holiday', 'school_season']\n","output_type":"stream"}],"execution_count":9},{"cell_type":"code","source":"X = train.drop('accident_risk', axis=1)\ny = train['accident_risk']","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.709301Z","iopub.execute_input":"2025-10-12T15:47:15.709486Z","iopub.status.idle":"2025-10-12T15:47:15.736412Z","shell.execute_reply.started":"2025-10-12T15:47:15.709472Z","shell.execute_reply":"2025-10-12T15:47:15.735923Z"}},"outputs":[],"execution_count":10},{"cell_type":"code","source":"X","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T17:16:58.578757Z","iopub.execute_input":"2025-10-12T17:16:58.579502Z","iopub.status.idle":"2025-10-12T17:16:58.593260Z","shell.execute_reply.started":"2025-10-12T17:16:58.579472Z","shell.execute_reply":"2025-10-12T17:16:58.592609Z"}},"outputs":[{"execution_count":81,"output_type":"execute_result","data":{"text/plain":"       road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n0          urban          2       0.06           35  daylight   rainy   \n1          urban          4       0.99           35  daylight   clear   \n2          rural          4       0.63           70       dim   clear   \n3        highway          4       0.07           35       dim   rainy   \n4          rural          1       0.58           60  daylight   foggy   \n...          ...        ...        ...          ...       ...     ...   \n517749   highway          4       0.10           70  daylight   foggy   \n517750     rural          4       0.47           35  daylight   rainy   \n517751     urban          4       0.62           25  daylight   foggy   \n517752   highway          3       0.63           25     night   clear   \n517753   highway          2       0.31           45       dim   rainy   \n\n        road_signs_present  public_road time_of_day  holiday  school_season  \\\n0                    False         True   afternoon    False           True   \n1                     True        False     evening     True           True   \n2                    False         True     morning     True          False   \n3                     True         True     morning    False          False   \n4                    False        False     evening     True          False   \n...                    ...          ...         ...      ...            ...   \n517749                True         True   afternoon    False          False   \n517750                True         True     morning    False          False   \n517751               False        False   afternoon    False           True   \n517752                True        False   afternoon     True           True   \n517753               False         True   afternoon     True           True   \n\n        num_reported_accidents  \n0                            1  \n1                            0  \n2                            2  \n3                            1  \n4                            1  \n...                        ...  \n517749                       2  \n517750                       1  \n517751                       0  \n517752                       3  \n517753                       2  \n\n[517754 rows x 12 columns]","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>road_type</th>\n      <th>num_lanes</th>\n      <th>curvature</th>\n      <th>speed_limit</th>\n      <th>lighting</th>\n      <th>weather</th>\n      <th>road_signs_present</th>\n      <th>public_road</th>\n      <th>time_of_day</th>\n      <th>holiday</th>\n      <th>school_season</th>\n      <th>num_reported_accidents</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>0</th>\n      <td>urban</td>\n      <td>2</td>\n      <td>0.06</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>rainy</td>\n      <td>False</td>\n      <td>True</td>\n      <td>afternoon</td>\n      <td>False</td>\n      <td>True</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>1</th>\n      <td>urban</td>\n      <td>4</td>\n      <td>0.99</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>False</td>\n      <td>evening</td>\n      <td>True</td>\n      <td>True</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>2</th>\n      <td>rural</td>\n      <td>4</td>\n      <td>0.63</td>\n      <td>70</td>\n      <td>dim</td>\n      <td>clear</td>\n      <td>False</td>\n      <td>True</td>\n      <td>morning</td>\n      <td>True</td>\n      <td>False</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>3</th>\n      <td>highway</td>\n      <td>4</td>\n      <td>0.07</td>\n      <td>35</td>\n      <td>dim</td>\n      <td>rainy</td>\n      <td>True</td>\n      <td>True</td>\n      <td>morning</td>\n      <td>False</td>\n      <td>False</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>4</th>\n      <td>rural</td>\n      <td>1</td>\n      <td>0.58</td>\n      <td>60</td>\n      <td>daylight</td>\n      <td>foggy</td>\n      <td>False</td>\n      <td>False</td>\n      <td>evening</td>\n      <td>True</td>\n      <td>False</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>...</th>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n    </tr>\n    <tr>\n      <th>517749</th>\n      <td>highway</td>\n      <td>4</td>\n      <td>0.10</td>\n      <td>70</td>\n      <td>daylight</td>\n      <td>foggy</td>\n      <td>True</td>\n      <td>True</td>\n      <td>afternoon</td>\n      <td>False</td>\n      <td>False</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>517750</th>\n      <td>rural</td>\n      <td>4</td>\n      <td>0.47</td>\n      <td>35</td>\n      <td>daylight</td>\n      <td>rainy</td>\n      <td>True</td>\n      <td>True</td>\n      <td>morning</td>\n      <td>False</td>\n      <td>False</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>517751</th>\n      <td>urban</td>\n      <td>4</td>\n      <td>0.62</td>\n      <td>25</td>\n      <td>daylight</td>\n      <td>foggy</td>\n      <td>False</td>\n      <td>False</td>\n      <td>afternoon</td>\n      <td>False</td>\n      <td>True</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>517752</th>\n      <td>highway</td>\n      <td>3</td>\n      <td>0.63</td>\n      <td>25</td>\n      <td>night</td>\n      <td>clear</td>\n      <td>True</td>\n      <td>False</td>\n      <td>afternoon</td>\n      <td>True</td>\n      <td>True</td>\n      <td>3</td>\n    </tr>\n    <tr>\n      <th>517753</th>\n      <td>highway</td>\n      <td>2</td>\n      <td>0.31</td>\n      <td>45</td>\n      <td>dim</td>\n      <td>rainy</td>\n      <td>False</td>\n      <td>True</td>\n      <td>afternoon</td>\n      <td>True</td>\n      <td>True</td>\n      <td>2</td>\n    </tr>\n  </tbody>\n</table>\n<p>517754 rows × 12 columns</p>\n</div>"},"metadata":{}}],"execution_count":81},{"cell_type":"code","source":"nums.pop()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.737029Z","iopub.execute_input":"2025-10-12T15:47:15.737196Z","iopub.status.idle":"2025-10-12T15:47:15.741682Z","shell.execute_reply.started":"2025-10-12T15:47:15.737182Z","shell.execute_reply":"2025-10-12T15:47:15.741004Z"}},"outputs":[{"execution_count":11,"output_type":"execute_result","data":{"text/plain":"'accident_risk'"},"metadata":{}}],"execution_count":11},{"cell_type":"code","source":"nums","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.742433Z","iopub.execute_input":"2025-10-12T15:47:15.742660Z","iopub.status.idle":"2025-10-12T15:47:15.754745Z","shell.execute_reply.started":"2025-10-12T15:47:15.742644Z","shell.execute_reply":"2025-10-12T15:47:15.754255Z"}},"outputs":[{"execution_count":12,"output_type":"execute_result","data":{"text/plain":"['num_lanes', 'curvature', 'speed_limit', 'num_reported_accidents']"},"metadata":{}}],"execution_count":12},{"cell_type":"code","source":"from sklearn.pipeline import Pipeline\nfrom sklearn.compose import ColumnTransformer\nfrom sklearn.preprocessing import StandardScaler, OrdinalEncoder\n\nole = OrdinalEncoder()\nscaler = StandardScaler()\n\npreprocessor = ColumnTransformer([\n    ('cat', ole, cats),\n    ('num', scaler, ['speed_limit'])\n], remainder='passthrough')\n\npipe = Pipeline([\n    ('preprocessing', preprocessor)\n])\npipe.set_output(transform=\"pandas\")\nX_processed = pipe.fit_transform(X)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:15.757570Z","iopub.execute_input":"2025-10-12T15:47:15.758040Z","iopub.status.idle":"2025-10-12T15:47:16.411181Z","shell.execute_reply.started":"2025-10-12T15:47:15.758024Z","shell.execute_reply":"2025-10-12T15:47:16.410606Z"}},"outputs":[],"execution_count":13},{"cell_type":"code","source":"X_processed.head(10)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:46:03.347324Z","iopub.execute_input":"2025-10-12T16:46:03.348021Z","iopub.status.idle":"2025-10-12T16:46:03.363003Z","shell.execute_reply.started":"2025-10-12T16:46:03.347997Z","shell.execute_reply":"2025-10-12T16:46:03.362098Z"}},"outputs":[{"execution_count":62,"output_type":"execute_result","data":{"text/plain":"   cat__road_type  cat__lighting  cat__weather  cat__road_signs_present  \\\n0             2.0            0.0           2.0                      0.0   \n1             2.0            0.0           0.0                      1.0   \n2             1.0            1.0           0.0                      0.0   \n3             0.0            1.0           2.0                      1.0   \n4             1.0            0.0           1.0                      0.0   \n5             0.0            2.0           1.0                      1.0   \n6             0.0            2.0           1.0                      0.0   \n7             0.0            0.0           0.0                      0.0   \n8             1.0            1.0           0.0                      1.0   \n9             2.0            1.0           0.0                      1.0   \n\n   cat__public_road  cat__time_of_day  cat__holiday  cat__school_season  \\\n0               1.0               0.0           0.0                 1.0   \n1               0.0               1.0           1.0                 1.0   \n2               1.0               2.0           1.0                 0.0   \n3               1.0               2.0           0.0                 0.0   \n4               0.0               1.0           1.0                 0.0   \n5               0.0               2.0           0.0                 1.0   \n6               1.0               2.0           1.0                 0.0   \n7               1.0               1.0           0.0                 1.0   \n8               0.0               1.0           1.0                 1.0   \n9               1.0               0.0           1.0                 1.0   \n\n   num__speed_limit  remainder__num_lanes  remainder__curvature  \\\n0         -0.703840                     2                  0.06   \n1         -0.703840                     4                  0.99   \n2          1.512963                     4                  0.63   \n3         -0.703840                     4                  0.07   \n4          0.879591                     1                  0.58   \n5          1.512963                     3                  0.54   \n6         -0.070467                     1                  0.04   \n7         -0.070467                     2                  0.33   \n8         -1.337212                     3                  0.63   \n9         -0.070467                     4                  0.38   \n\n   remainder__num_reported_accidents  \n0                                  1  \n1                                  0  \n2                                  2  \n3                                  1  \n4                                  1  \n5                                  0  \n6                                  2  \n7                                  0  \n8                                  2  \n9                                  2  ","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>cat__road_type</th>\n      <th>cat__lighting</th>\n      <th>cat__weather</th>\n      <th>cat__road_signs_present</th>\n      <th>cat__public_road</th>\n      <th>cat__time_of_day</th>\n      <th>cat__holiday</th>\n      <th>cat__school_season</th>\n      <th>num__speed_limit</th>\n      <th>remainder__num_lanes</th>\n      <th>remainder__curvature</th>\n      <th>remainder__num_reported_accidents</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>0</th>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>-0.703840</td>\n      <td>2</td>\n      <td>0.06</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>1</th>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>-0.703840</td>\n      <td>4</td>\n      <td>0.99</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>2</th>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.512963</td>\n      <td>4</td>\n      <td>0.63</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>3</th>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>-0.703840</td>\n      <td>4</td>\n      <td>0.07</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>4</th>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.879591</td>\n      <td>1</td>\n      <td>0.58</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>5</th>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.512963</td>\n      <td>3</td>\n      <td>0.54</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>6</th>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>-0.070467</td>\n      <td>1</td>\n      <td>0.04</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>7</th>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>-0.070467</td>\n      <td>2</td>\n      <td>0.33</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>8</th>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>-1.337212</td>\n      <td>3</td>\n      <td>0.63</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>9</th>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>-0.070467</td>\n      <td>4</td>\n      <td>0.38</td>\n      <td>2</td>\n    </tr>\n  </tbody>\n</table>\n</div>"},"metadata":{}}],"execution_count":62},{"cell_type":"code","source":"X_processed['cat__school_season'].unique()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:53:45.910098Z","iopub.execute_input":"2025-10-12T16:53:45.910542Z","iopub.status.idle":"2025-10-12T16:53:45.921765Z","shell.execute_reply.started":"2025-10-12T16:53:45.910521Z","shell.execute_reply":"2025-10-12T16:53:45.921080Z"}},"outputs":[{"execution_count":77,"output_type":"execute_result","data":{"text/plain":"array([1., 0.])"},"metadata":{}}],"execution_count":77},{"cell_type":"code","source":"train['school_season'].unique()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:53:47.371241Z","iopub.execute_input":"2025-10-12T16:53:47.371450Z","iopub.status.idle":"2025-10-12T16:53:47.378407Z","shell.execute_reply.started":"2025-10-12T16:53:47.371435Z","shell.execute_reply":"2025-10-12T16:53:47.377805Z"}},"outputs":[{"execution_count":78,"output_type":"execute_result","data":{"text/plain":"array([ True, False])"},"metadata":{}}],"execution_count":78},{"cell_type":"code","source":"processed_cats = []\nprocessed_nums = []\n\nfor each in X_processed.columns:\n    if 'cat' in each:\n        processed_cats.append(each)\n    elif 'num' in each or 'remainder' in each:\n        processed_nums.append(each)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:16.431689Z","iopub.execute_input":"2025-10-12T15:47:16.432076Z","iopub.status.idle":"2025-10-12T15:47:16.438851Z","shell.execute_reply.started":"2025-10-12T15:47:16.432049Z","shell.execute_reply":"2025-10-12T15:47:16.438291Z"}},"outputs":[],"execution_count":15},{"cell_type":"code","source":"processed_cats","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:16.439611Z","iopub.execute_input":"2025-10-12T15:47:16.439916Z","iopub.status.idle":"2025-10-12T15:47:16.454714Z","shell.execute_reply.started":"2025-10-12T15:47:16.439876Z","shell.execute_reply":"2025-10-12T15:47:16.454042Z"}},"outputs":[{"execution_count":16,"output_type":"execute_result","data":{"text/plain":"['cat__road_type',\n 'cat__lighting',\n 'cat__weather',\n 'cat__road_signs_present',\n 'cat__public_road',\n 'cat__time_of_day',\n 'cat__holiday',\n 'cat__school_season']"},"metadata":{}}],"execution_count":16},{"cell_type":"code","source":"processed_nums","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:16.455331Z","iopub.execute_input":"2025-10-12T15:47:16.455536Z","iopub.status.idle":"2025-10-12T15:47:16.470572Z","shell.execute_reply.started":"2025-10-12T15:47:16.455522Z","shell.execute_reply":"2025-10-12T15:47:16.470067Z"}},"outputs":[{"execution_count":17,"output_type":"execute_result","data":{"text/plain":"['num__speed_limit',\n 'remainder__num_lanes',\n 'remainder__curvature',\n 'remainder__num_reported_accidents']"},"metadata":{}}],"execution_count":17},{"cell_type":"code","source":"from tensorflow.keras.callbacks import EarlyStopping\n\nearlystop = EarlyStopping(\n    monitor='val_loss',\n    patience=5,\n    restore_best_weights=True\n)\n\nmodel = Sequential()\n\n# input layer - 12 inputs\nmodel.add(Dense(384, input_shape=(12,), activation='relu'))\nmodel.add(Dense(192, activation='relu'))\nmodel.add(Dense(96, activation='relu'))\nmodel.add(Dense(72, activation='relu'))\nmodel.add(Dense(48, activation='relu'))\nmodel.add(Dense(24, activation='relu'))\nmodel.add(Dense(12, activation='relu'))\nmodel.add(Dense(6, activation='relu'))\n\n# output\nmodel.add(Dense(1, activation='linear'))\n\nmodel.compile(loss='mse', optimizer='adam', metrics=['mae'])\nmodel.summary()","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:16.471149Z","iopub.execute_input":"2025-10-12T15:47:16.471361Z","iopub.status.idle":"2025-10-12T15:47:18.656677Z","shell.execute_reply.started":"2025-10-12T15:47:16.471347Z","shell.execute_reply":"2025-10-12T15:47:18.656155Z"}},"outputs":[{"name":"stderr","text":"/usr/local/lib/python3.11/dist-packages/keras/src/layers/core/dense.py:87: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.\n  super().__init__(activity_regularizer=activity_regularizer, **kwargs)\nI0000 00:00:1760284037.394200      36 gpu_device.cc:2022] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 13942 MB memory:  -> device: 0, name: Tesla T4, pci bus id: 0000:00:04.0, compute capability: 7.5\nI0000 00:00:1760284037.394874      36 gpu_device.cc:2022] Created device /job:localhost/replica:0/task:0/device:GPU:1 with 13942 MB memory:  -> device: 1, name: Tesla T4, pci bus id: 0000:00:05.0, compute capability: 7.5\n","output_type":"stream"},{"output_type":"display_data","data":{"text/plain":"\u001b[1mModel: \"sequential\"\u001b[0m\n","text/html":"<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\">Model: \"sequential\"</span>\n</pre>\n"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓\n┃\u001b[1m \u001b[0m\u001b[1mLayer (type)                   \u001b[0m\u001b[1m \u001b[0m┃\u001b[1m \u001b[0m\u001b[1mOutput Shape          \u001b[0m\u001b[1m \u001b[0m┃\u001b[1m \u001b[0m\u001b[1m      Param #\u001b[0m\u001b[1m \u001b[0m┃\n┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩\n│ dense (\u001b[38;5;33mDense\u001b[0m)                   │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m384\u001b[0m)            │         \u001b[38;5;34m4,992\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_1 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m192\u001b[0m)            │        \u001b[38;5;34m73,920\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_2 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m96\u001b[0m)             │        \u001b[38;5;34m18,528\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_3 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m72\u001b[0m)             │         \u001b[38;5;34m6,984\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_4 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m48\u001b[0m)             │         \u001b[38;5;34m3,504\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_5 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m24\u001b[0m)             │         \u001b[38;5;34m1,176\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_6 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m12\u001b[0m)             │           \u001b[38;5;34m300\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_7 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m6\u001b[0m)              │            \u001b[38;5;34m78\u001b[0m │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_8 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m1\u001b[0m)              │             \u001b[38;5;34m7\u001b[0m │\n└─────────────────────────────────┴────────────────────────┴───────────────┘\n","text/html":"<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓\n┃<span style=\"font-weight: bold\"> Layer (type)                    </span>┃<span style=\"font-weight: bold\"> Output Shape           </span>┃<span style=\"font-weight: bold\">       Param # </span>┃\n┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩\n│ dense (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                   │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">384</span>)            │         <span style=\"color: #00af00; text-decoration-color: #00af00\">4,992</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_1 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">192</span>)            │        <span style=\"color: #00af00; text-decoration-color: #00af00\">73,920</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_2 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">96</span>)             │        <span style=\"color: #00af00; text-decoration-color: #00af00\">18,528</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_3 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">72</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">6,984</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_4 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">48</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">3,504</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_5 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">24</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">1,176</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_6 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">12</span>)             │           <span style=\"color: #00af00; text-decoration-color: #00af00\">300</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_7 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">6</span>)              │            <span style=\"color: #00af00; text-decoration-color: #00af00\">78</span> │\n├─────────────────────────────────┼────────────────────────┼───────────────┤\n│ dense_8 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">1</span>)              │             <span style=\"color: #00af00; text-decoration-color: #00af00\">7</span> │\n└─────────────────────────────────┴────────────────────────┴───────────────┘\n</pre>\n"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"\u001b[1m Total params: \u001b[0m\u001b[38;5;34m109,489\u001b[0m (427.69 KB)\n","text/html":"<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Total params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">109,489</span> (427.69 KB)\n</pre>\n"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"\u001b[1m Trainable params: \u001b[0m\u001b[38;5;34m109,489\u001b[0m (427.69 KB)\n","text/html":"<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Trainable params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">109,489</span> (427.69 KB)\n</pre>\n"},"metadata":{}},{"output_type":"display_data","data":{"text/plain":"\u001b[1m Non-trainable params: \u001b[0m\u001b[38;5;34m0\u001b[0m (0.00 B)\n","text/html":"<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Non-trainable params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">0</span> (0.00 B)\n</pre>\n"},"metadata":{}}],"execution_count":18},{"cell_type":"code","source":"X_train","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:27:35.938014Z","iopub.execute_input":"2025-10-12T16:27:35.938305Z","iopub.status.idle":"2025-10-12T16:27:35.958040Z","shell.execute_reply.started":"2025-10-12T16:27:35.938282Z","shell.execute_reply":"2025-10-12T16:27:35.957327Z"}},"outputs":[{"execution_count":44,"output_type":"execute_result","data":{"text/plain":"        cat__road_type  cat__lighting  cat__weather  cat__road_signs_present  \\\n406072             1.0            1.0           2.0                      0.0   \n83732              2.0            1.0           1.0                      1.0   \n262931             1.0            2.0           2.0                      0.0   \n634                0.0            1.0           0.0                      1.0   \n291964             1.0            2.0           1.0                      0.0   \n...                ...            ...           ...                      ...   \n259178             1.0            1.0           0.0                      0.0   \n365838             1.0            1.0           2.0                      0.0   \n131932             0.0            2.0           0.0                      1.0   \n146867             1.0            2.0           2.0                      1.0   \n121958             1.0            0.0           0.0                      0.0   \n\n        cat__public_road  cat__time_of_day  cat__holiday  cat__school_season  \\\n406072               1.0               0.0           1.0                 1.0   \n83732                1.0               1.0           0.0                 0.0   \n262931               0.0               1.0           0.0                 0.0   \n634                  0.0               1.0           0.0                 0.0   \n291964               0.0               2.0           1.0                 0.0   \n...                  ...               ...           ...                 ...   \n259178               1.0               2.0           1.0                 0.0   \n365838               0.0               1.0           1.0                 1.0   \n131932               1.0               0.0           0.0                 1.0   \n146867               0.0               1.0           0.0                 0.0   \n121958               0.0               1.0           0.0                 0.0   \n\n        num__speed_limit  remainder__num_lanes  remainder__curvature  \\\n406072         -1.337212                     4                  0.67   \n83732           0.879591                     2                  0.73   \n262931         -0.070467                     4                  0.09   \n634            -1.337212                     1                  0.71   \n291964         -0.703840                     3                  0.84   \n...                  ...                   ...                   ...   \n259178          0.879591                     4                  0.05   \n365838          1.512963                     3                  0.47   \n131932          1.512963                     3                  0.51   \n146867          0.879591                     3                  0.91   \n121958          0.879591                     3                  0.78   \n\n        remainder__num_reported_accidents  \n406072                                  3  \n83732                                   0  \n262931                                  2  \n634                                     1  \n291964                                  0  \n...                                   ...  \n259178                                  1  \n365838                                  1  \n131932                                  2  \n146867                                  4  \n121958                                  0  \n\n[362427 rows x 12 columns]","text/html":"<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>cat__road_type</th>\n      <th>cat__lighting</th>\n      <th>cat__weather</th>\n      <th>cat__road_signs_present</th>\n      <th>cat__public_road</th>\n      <th>cat__time_of_day</th>\n      <th>cat__holiday</th>\n      <th>cat__school_season</th>\n      <th>num__speed_limit</th>\n      <th>remainder__num_lanes</th>\n      <th>remainder__curvature</th>\n      <th>remainder__num_reported_accidents</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>406072</th>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>-1.337212</td>\n      <td>4</td>\n      <td>0.67</td>\n      <td>3</td>\n    </tr>\n    <tr>\n      <th>83732</th>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.879591</td>\n      <td>2</td>\n      <td>0.73</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>262931</th>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>-0.070467</td>\n      <td>4</td>\n      <td>0.09</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>634</th>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>-1.337212</td>\n      <td>1</td>\n      <td>0.71</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>291964</th>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>-0.703840</td>\n      <td>3</td>\n      <td>0.84</td>\n      <td>0</td>\n    </tr>\n    <tr>\n      <th>...</th>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n    </tr>\n    <tr>\n      <th>259178</th>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.879591</td>\n      <td>4</td>\n      <td>0.05</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>365838</th>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>1.512963</td>\n      <td>3</td>\n      <td>0.47</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>131932</th>\n      <td>0.0</td>\n      <td>2.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>1.512963</td>\n      <td>3</td>\n      <td>0.51</td>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>146867</th>\n      <td>1.0</td>\n      <td>2.0</td>\n      <td>2.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.879591</td>\n      <td>3</td>\n      <td>0.91</td>\n      <td>4</td>\n    </tr>\n    <tr>\n      <th>121958</th>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>1.0</td>\n      <td>0.0</td>\n      <td>0.0</td>\n      <td>0.879591</td>\n      <td>3</td>\n      <td>0.78</td>\n      <td>0</td>\n    </tr>\n  </tbody>\n</table>\n<p>362427 rows × 12 columns</p>\n</div>"},"metadata":{}}],"execution_count":44},{"cell_type":"code","source":"from sklearn.model_selection import train_test_split\n\nX_train, X_test, y_train, y_test = train_test_split(X_processed, y, random_state=42, test_size=0.3)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:18.657291Z","iopub.execute_input":"2025-10-12T15:47:18.657546Z","iopub.status.idle":"2025-10-12T15:47:18.835645Z","shell.execute_reply.started":"2025-10-12T15:47:18.657528Z","shell.execute_reply":"2025-10-12T15:47:18.835113Z"}},"outputs":[],"execution_count":19},{"cell_type":"code","source":"X_train.shape, X_test.shape, y_train.shape, y_test.shape","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:47:18.836342Z","iopub.execute_input":"2025-10-12T15:47:18.836547Z","iopub.status.idle":"2025-10-12T15:47:18.841616Z","shell.execute_reply.started":"2025-10-12T15:47:18.836531Z","shell.execute_reply":"2025-10-12T15:47:18.840936Z"}},"outputs":[{"execution_count":20,"output_type":"execute_result","data":{"text/plain":"((362427, 12), (155327, 12), (362427,), (155327,))"},"metadata":{}}],"execution_count":20},{"cell_type":"code","source":"import time\n\nprint(\"Time starts now\")\nstart = time.time()\n\nhistory = model.fit(\n    X_train, y_train,\n    validation_data=(X_test, y_test),\n    epochs=100,\n    batch_size=32,\n    callbacks=earlystop\n)\n\nprint(f\"Ends after {time.time() - start}s\")","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:52:35.718263Z","iopub.execute_input":"2025-10-12T15:52:35.718803Z","iopub.status.idle":"2025-10-12T15:57:07.252683Z","shell.execute_reply.started":"2025-10-12T15:52:35.718784Z","shell.execute_reply":"2025-10-12T15:57:07.252130Z"}},"outputs":[{"name":"stdout","text":"Time starts now\nEpoch 1/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0445 - val_loss: 0.0033 - val_mae: 0.0443\nEpoch 2/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0032 - mae: 0.0444 - val_loss: 0.0034 - val_mae: 0.0451\nEpoch 3/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0444 - val_loss: 0.0033 - val_mae: 0.0444\nEpoch 4/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0032 - mae: 0.0443 - val_loss: 0.0033 - val_mae: 0.0448\nEpoch 5/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0443 - val_loss: 0.0033 - val_mae: 0.0446\nEpoch 6/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0032 - mae: 0.0443 - val_loss: 0.0033 - val_mae: 0.0446\nEpoch 7/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0032 - mae: 0.0442 - val_loss: 0.0033 - val_mae: 0.0448\nEpoch 8/100\n\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0032 - mae: 0.0443 - val_loss: 0.0033 - val_mae: 0.0444\nEnds after 271.5304319858551s\n","output_type":"stream"}],"execution_count":23},{"cell_type":"code","source":"test_processed = pipe.fit_transform(test)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:15.503946Z","iopub.execute_input":"2025-10-12T15:57:15.504214Z","iopub.status.idle":"2025-10-12T15:57:15.683428Z","shell.execute_reply.started":"2025-10-12T15:57:15.504197Z","shell.execute_reply":"2025-10-12T15:57:15.682793Z"}},"outputs":[],"execution_count":24},{"cell_type":"code","source":"preds = model.predict(test_processed)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:16.653246Z","iopub.execute_input":"2025-10-12T15:57:16.653500Z","iopub.status.idle":"2025-10-12T15:57:27.021460Z","shell.execute_reply.started":"2025-10-12T15:57:16.653482Z","shell.execute_reply":"2025-10-12T15:57:27.020668Z"}},"outputs":[{"name":"stdout","text":"\u001b[1m5394/5394\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m8s\u001b[0m 1ms/step\n","output_type":"stream"}],"execution_count":25},{"cell_type":"code","source":"test_processed.shape[0]","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:28.771132Z","iopub.execute_input":"2025-10-12T15:57:28.771397Z","iopub.status.idle":"2025-10-12T15:57:28.776046Z","shell.execute_reply.started":"2025-10-12T15:57:28.771379Z","shell.execute_reply":"2025-10-12T15:57:28.775478Z"}},"outputs":[{"execution_count":26,"output_type":"execute_result","data":{"text/plain":"172585"},"metadata":{}}],"execution_count":26},{"cell_type":"code","source":"pred_list = []\nfor i in range(172585):\n    pred_list.append(preds[i][0])\n    ","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:29.792112Z","iopub.execute_input":"2025-10-12T15:57:29.792361Z","iopub.status.idle":"2025-10-12T15:57:29.848243Z","shell.execute_reply.started":"2025-10-12T15:57:29.792343Z","shell.execute_reply":"2025-10-12T15:57:29.847708Z"}},"outputs":[],"execution_count":27},{"cell_type":"code","source":"y_pred = model.predict(X_test)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:37.415352Z","iopub.execute_input":"2025-10-12T15:57:37.415617Z","iopub.status.idle":"2025-10-12T15:57:46.364877Z","shell.execute_reply.started":"2025-10-12T15:57:37.415597Z","shell.execute_reply":"2025-10-12T15:57:46.364275Z"}},"outputs":[{"name":"stdout","text":"\u001b[1m4854/4854\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m6s\u001b[0m 1ms/step\n","output_type":"stream"}],"execution_count":29},{"cell_type":"code","source":"from sklearn.metrics import r2_score\nr2_score(y_test, y_pred)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:47.080984Z","iopub.execute_input":"2025-10-12T15:57:47.081204Z","iopub.status.idle":"2025-10-12T15:57:47.090164Z","shell.execute_reply.started":"2025-10-12T15:57:47.081189Z","shell.execute_reply":"2025-10-12T15:57:47.089517Z"}},"outputs":[{"execution_count":30,"output_type":"execute_result","data":{"text/plain":"0.8819356022020048"},"metadata":{}}],"execution_count":30},{"cell_type":"code","source":"ids = list(test_id)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:48.836089Z","iopub.execute_input":"2025-10-12T15:57:48.836324Z","iopub.status.idle":"2025-10-12T15:57:48.853338Z","shell.execute_reply.started":"2025-10-12T15:57:48.836309Z","shell.execute_reply":"2025-10-12T15:57:48.852701Z"}},"outputs":[],"execution_count":31},{"cell_type":"code","source":"submission = {\n    'id' : ids,\n    'accident_risk': pred_list\n}","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:49.909136Z","iopub.execute_input":"2025-10-12T15:57:49.909381Z","iopub.status.idle":"2025-10-12T15:57:49.912760Z","shell.execute_reply.started":"2025-10-12T15:57:49.909364Z","shell.execute_reply":"2025-10-12T15:57:49.912043Z"}},"outputs":[],"execution_count":32},{"cell_type":"code","source":"my_submission = pd.DataFrame(submission)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:51.640701Z","iopub.execute_input":"2025-10-12T15:57:51.640979Z","iopub.status.idle":"2025-10-12T15:57:51.718284Z","shell.execute_reply.started":"2025-10-12T15:57:51.640957Z","shell.execute_reply":"2025-10-12T15:57:51.717775Z"}},"outputs":[],"execution_count":33},{"cell_type":"code","source":"my_submission.to_csv(\"submission.csv\", index=False)","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T15:57:52.207919Z","iopub.execute_input":"2025-10-12T15:57:52.208142Z","iopub.status.idle":"2025-10-12T15:57:52.445245Z","shell.execute_reply.started":"2025-10-12T15:57:52.208126Z","shell.execute_reply":"2025-10-12T15:57:52.444696Z"}},"outputs":[],"execution_count":34},{"cell_type":"code","source":"model.save('road_prediction.keras')","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:16:23.191135Z","iopub.execute_input":"2025-10-12T16:16:23.191401Z","iopub.status.idle":"2025-10-12T16:16:23.270198Z","shell.execute_reply.started":"2025-10-12T16:16:23.191381Z","shell.execute_reply":"2025-10-12T16:16:23.269648Z"}},"outputs":[],"execution_count":39},{"cell_type":"code","source":"import joblib\njoblib.dump(pipe, 'pipeline.pkl')","metadata":{"trusted":true,"execution":{"iopub.status.busy":"2025-10-12T16:22:10.017380Z","iopub.execute_input":"2025-10-12T16:22:10.018048Z","iopub.status.idle":"2025-10-12T16:22:10.026206Z","shell.execute_reply.started":"2025-10-12T16:22:10.018025Z","shell.execute_reply":"2025-10-12T16:22:10.025415Z"}},"outputs":[{"execution_count":41,"output_type":"execute_result","data":{"text/plain":"['pipeline.pkl']"},"metadata":{}}],"execution_count":41},{"cell_type":"code","source":"","metadata":{"trusted":true},"outputs":[],"execution_count":null}]}
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "3b62886a",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:16:42.617384Z",
+     "iopub.status.busy": "2025-10-18T11:16:42.617123Z",
+     "iopub.status.idle": "2025-10-18T11:16:59.386433Z",
+     "shell.execute_reply": "2025-10-18T11:16:59.385639Z"
+    },
+    "papermill": {
+     "duration": 16.77695,
+     "end_time": "2025-10-18T11:16:59.387942",
+     "exception": false,
+     "start_time": "2025-10-18T11:16:42.610992",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "2025-10-18 11:16:47.412275: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered\n",
+      "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR\n",
+      "E0000 00:00:1760786207.632605      19 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered\n",
+      "E0000 00:00:1760786207.707600      19 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import seaborn as sns\n",
+    "import matplotlib.pyplot as plt\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.keras.models import Sequential\n",
+    "from tensorflow.keras.layers import Dense, Dropout, Flatten\n",
+    "from tensorflow.keras.callbacks import EarlyStopping"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "945feafd",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:16:59.399178Z",
+     "iopub.status.busy": "2025-10-18T11:16:59.398531Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.531385Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.530695Z"
+    },
+    "papermill": {
+     "duration": 1.139321,
+     "end_time": "2025-10-18T11:17:00.532569",
+     "exception": false,
+     "start_time": "2025-10-18T11:16:59.393248",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>road_type</th>\n",
+       "      <th>num_lanes</th>\n",
+       "      <th>curvature</th>\n",
+       "      <th>speed_limit</th>\n",
+       "      <th>lighting</th>\n",
+       "      <th>weather</th>\n",
+       "      <th>road_signs_present</th>\n",
+       "      <th>public_road</th>\n",
+       "      <th>time_of_day</th>\n",
+       "      <th>holiday</th>\n",
+       "      <th>school_season</th>\n",
+       "      <th>num_reported_accidents</th>\n",
+       "      <th>accident_risk</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>urban</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.06</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.13</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>1</td>\n",
+       "      <td>urban</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.99</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>evening</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0.35</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>2</td>\n",
+       "      <td>rural</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.63</td>\n",
+       "      <td>70</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>morning</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.30</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>3</td>\n",
+       "      <td>highway</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.07</td>\n",
+       "      <td>35</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>morning</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.21</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>4</td>\n",
+       "      <td>rural</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.58</td>\n",
+       "      <td>60</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>foggy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>evening</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.56</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   id road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n",
+       "0   0     urban          2       0.06           35  daylight   rainy   \n",
+       "1   1     urban          4       0.99           35  daylight   clear   \n",
+       "2   2     rural          4       0.63           70       dim   clear   \n",
+       "3   3   highway          4       0.07           35       dim   rainy   \n",
+       "4   4     rural          1       0.58           60  daylight   foggy   \n",
+       "\n",
+       "   road_signs_present  public_road time_of_day  holiday  school_season  \\\n",
+       "0               False         True   afternoon    False           True   \n",
+       "1                True        False     evening     True           True   \n",
+       "2               False         True     morning     True          False   \n",
+       "3                True         True     morning    False          False   \n",
+       "4               False        False     evening     True          False   \n",
+       "\n",
+       "   num_reported_accidents  accident_risk  \n",
+       "0                       1           0.13  \n",
+       "1                       0           0.35  \n",
+       "2                       2           0.30  \n",
+       "3                       1           0.21  \n",
+       "4                       1           0.56  "
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train = pd.read_csv(\"/kaggle/input/playground-series-s5e10/train.csv\")\n",
+    "test = pd.read_csv(\"/kaggle/input/playground-series-s5e10/test.csv\")\n",
+    "train.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "7f265e8c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.543532Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.543299Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.553156Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.552547Z"
+    },
+    "papermill": {
+     "duration": 0.016482,
+     "end_time": "2025-10-18T11:17:00.554177",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.537695",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>road_type</th>\n",
+       "      <th>num_lanes</th>\n",
+       "      <th>curvature</th>\n",
+       "      <th>speed_limit</th>\n",
+       "      <th>lighting</th>\n",
+       "      <th>weather</th>\n",
+       "      <th>road_signs_present</th>\n",
+       "      <th>public_road</th>\n",
+       "      <th>time_of_day</th>\n",
+       "      <th>holiday</th>\n",
+       "      <th>school_season</th>\n",
+       "      <th>num_reported_accidents</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>517754</td>\n",
+       "      <td>highway</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.34</td>\n",
+       "      <td>45</td>\n",
+       "      <td>night</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>517755</td>\n",
+       "      <td>urban</td>\n",
+       "      <td>3</td>\n",
+       "      <td>0.04</td>\n",
+       "      <td>45</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>foggy</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>517756</td>\n",
+       "      <td>urban</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.59</td>\n",
+       "      <td>35</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>517757</td>\n",
+       "      <td>rural</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.95</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>517758</td>\n",
+       "      <td>highway</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.86</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>evening</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>3</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "       id road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n",
+       "0  517754   highway          2       0.34           45     night   clear   \n",
+       "1  517755     urban          3       0.04           45       dim   foggy   \n",
+       "2  517756     urban          2       0.59           35       dim   clear   \n",
+       "3  517757     rural          4       0.95           35  daylight   rainy   \n",
+       "4  517758   highway          2       0.86           35  daylight   clear   \n",
+       "\n",
+       "   road_signs_present  public_road time_of_day  holiday  school_season  \\\n",
+       "0                True         True   afternoon     True           True   \n",
+       "1                True        False   afternoon     True          False   \n",
+       "2                True        False   afternoon     True           True   \n",
+       "3               False        False   afternoon    False          False   \n",
+       "4                True        False     evening    False           True   \n",
+       "\n",
+       "   num_reported_accidents  \n",
+       "0                       1  \n",
+       "1                       0  \n",
+       "2                       1  \n",
+       "3                       2  \n",
+       "4                       3  "
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "test.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "db67fa6d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.565133Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.564913Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.592461Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.591944Z"
+    },
+    "papermill": {
+     "duration": 0.03402,
+     "end_time": "2025-10-18T11:17:00.593528",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.559508",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train.drop('id', axis=1, inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "86cfe712",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.604358Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.603780Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.612556Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.611861Z"
+    },
+    "papermill": {
+     "duration": 0.015575,
+     "end_time": "2025-10-18T11:17:00.614060",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.598485",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "test_id = test['id']\n",
+    "test.drop('id', inplace=True, axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "18b104e5",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.624464Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.624253Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.628276Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.627722Z"
+    },
+    "papermill": {
+     "duration": 0.010331,
+     "end_time": "2025-10-18T11:17:00.629251",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.618920",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(517754, 13)"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "25a54160",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.640581Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.640128Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.750542Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.749787Z"
+    },
+    "papermill": {
+     "duration": 0.116904,
+     "end_time": "2025-10-18T11:17:00.751736",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.634832",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "<class 'pandas.core.frame.DataFrame'>\n",
+      "RangeIndex: 517754 entries, 0 to 517753\n",
+      "Data columns (total 13 columns):\n",
+      " #   Column                  Non-Null Count   Dtype  \n",
+      "---  ------                  --------------   -----  \n",
+      " 0   road_type               517754 non-null  object \n",
+      " 1   num_lanes               517754 non-null  int64  \n",
+      " 2   curvature               517754 non-null  float64\n",
+      " 3   speed_limit             517754 non-null  int64  \n",
+      " 4   lighting                517754 non-null  object \n",
+      " 5   weather                 517754 non-null  object \n",
+      " 6   road_signs_present      517754 non-null  bool   \n",
+      " 7   public_road             517754 non-null  bool   \n",
+      " 8   time_of_day             517754 non-null  object \n",
+      " 9   holiday                 517754 non-null  bool   \n",
+      " 10  school_season           517754 non-null  bool   \n",
+      " 11  num_reported_accidents  517754 non-null  int64  \n",
+      " 12  accident_risk           517754 non-null  float64\n",
+      "dtypes: bool(4), float64(2), int64(3), object(4)\n",
+      "memory usage: 37.5+ MB\n"
+     ]
+    }
+   ],
+   "source": [
+    "train.info()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "89d48502",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.762526Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.762333Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.855198Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.854505Z"
+    },
+    "papermill": {
+     "duration": 0.09953,
+     "end_time": "2025-10-18T11:17:00.856402",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.756872",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>num_lanes</th>\n",
+       "      <th>curvature</th>\n",
+       "      <th>speed_limit</th>\n",
+       "      <th>num_reported_accidents</th>\n",
+       "      <th>accident_risk</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>count</th>\n",
+       "      <td>517754.000000</td>\n",
+       "      <td>517754.000000</td>\n",
+       "      <td>517754.000000</td>\n",
+       "      <td>517754.000000</td>\n",
+       "      <td>517754.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>mean</th>\n",
+       "      <td>2.491511</td>\n",
+       "      <td>0.488719</td>\n",
+       "      <td>46.112575</td>\n",
+       "      <td>1.187970</td>\n",
+       "      <td>0.352377</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>std</th>\n",
+       "      <td>1.120434</td>\n",
+       "      <td>0.272563</td>\n",
+       "      <td>15.788521</td>\n",
+       "      <td>0.895961</td>\n",
+       "      <td>0.166417</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>min</th>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>25.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>25%</th>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.260000</td>\n",
+       "      <td>35.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.230000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>50%</th>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>0.510000</td>\n",
+       "      <td>45.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.340000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>75%</th>\n",
+       "      <td>3.000000</td>\n",
+       "      <td>0.710000</td>\n",
+       "      <td>60.000000</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>0.460000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>max</th>\n",
+       "      <td>4.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>70.000000</td>\n",
+       "      <td>7.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "           num_lanes      curvature    speed_limit  num_reported_accidents  \\\n",
+       "count  517754.000000  517754.000000  517754.000000           517754.000000   \n",
+       "mean        2.491511       0.488719      46.112575                1.187970   \n",
+       "std         1.120434       0.272563      15.788521                0.895961   \n",
+       "min         1.000000       0.000000      25.000000                0.000000   \n",
+       "25%         1.000000       0.260000      35.000000                1.000000   \n",
+       "50%         2.000000       0.510000      45.000000                1.000000   \n",
+       "75%         3.000000       0.710000      60.000000                2.000000   \n",
+       "max         4.000000       1.000000      70.000000                7.000000   \n",
+       "\n",
+       "       accident_risk  \n",
+       "count  517754.000000  \n",
+       "mean        0.352377  \n",
+       "std         0.166417  \n",
+       "min         0.000000  \n",
+       "25%         0.230000  \n",
+       "50%         0.340000  \n",
+       "75%         0.460000  \n",
+       "max         1.000000  "
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train.describe()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "e732bd4b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.867589Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.867373Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.871767Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.871159Z"
+    },
+    "papermill": {
+     "duration": 0.010931,
+     "end_time": "2025-10-18T11:17:00.872777",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.861846",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Numericals ['num_lanes', 'curvature', 'speed_limit', 'num_reported_accidents', 'accident_risk']\n",
+      "Categoricals ['road_type', 'lighting', 'weather', 'road_signs_present', 'public_road', 'time_of_day', 'holiday', 'school_season']\n"
+     ]
+    }
+   ],
+   "source": [
+    "nums = []\n",
+    "cats = []\n",
+    "\n",
+    "for each in train.columns:\n",
+    "    if train[each].dtype == 'object' or train[each].dtype == 'bool':\n",
+    "        cats.append(each)\n",
+    "    else:\n",
+    "        nums.append(each)\n",
+    "\n",
+    "print(f\"Numericals {nums}\\nCategoricals {cats}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "89363759",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.884267Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.883655Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.901436Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.900950Z"
+    },
+    "papermill": {
+     "duration": 0.025076,
+     "end_time": "2025-10-18T11:17:00.903066",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.877990",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "X = train.drop('accident_risk', axis=1)\n",
+    "y = train['accident_risk']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "aab053d7",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.914232Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.914026Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.925937Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.925296Z"
+    },
+    "papermill": {
+     "duration": 0.018643,
+     "end_time": "2025-10-18T11:17:00.927064",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.908421",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>road_type</th>\n",
+       "      <th>num_lanes</th>\n",
+       "      <th>curvature</th>\n",
+       "      <th>speed_limit</th>\n",
+       "      <th>lighting</th>\n",
+       "      <th>weather</th>\n",
+       "      <th>road_signs_present</th>\n",
+       "      <th>public_road</th>\n",
+       "      <th>time_of_day</th>\n",
+       "      <th>holiday</th>\n",
+       "      <th>school_season</th>\n",
+       "      <th>num_reported_accidents</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>urban</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.06</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>urban</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.99</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>evening</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>rural</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.63</td>\n",
+       "      <td>70</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>morning</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>highway</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.07</td>\n",
+       "      <td>35</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>morning</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>rural</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.58</td>\n",
+       "      <td>60</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>foggy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>evening</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>517749</th>\n",
+       "      <td>highway</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.10</td>\n",
+       "      <td>70</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>foggy</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>517750</th>\n",
+       "      <td>rural</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.47</td>\n",
+       "      <td>35</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>morning</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>517751</th>\n",
+       "      <td>urban</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.62</td>\n",
+       "      <td>25</td>\n",
+       "      <td>daylight</td>\n",
+       "      <td>foggy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>False</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>517752</th>\n",
+       "      <td>highway</td>\n",
+       "      <td>3</td>\n",
+       "      <td>0.63</td>\n",
+       "      <td>25</td>\n",
+       "      <td>night</td>\n",
+       "      <td>clear</td>\n",
+       "      <td>True</td>\n",
+       "      <td>False</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>3</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>517753</th>\n",
+       "      <td>highway</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.31</td>\n",
+       "      <td>45</td>\n",
+       "      <td>dim</td>\n",
+       "      <td>rainy</td>\n",
+       "      <td>False</td>\n",
+       "      <td>True</td>\n",
+       "      <td>afternoon</td>\n",
+       "      <td>True</td>\n",
+       "      <td>True</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>517754 rows × 12 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "       road_type  num_lanes  curvature  speed_limit  lighting weather  \\\n",
+       "0          urban          2       0.06           35  daylight   rainy   \n",
+       "1          urban          4       0.99           35  daylight   clear   \n",
+       "2          rural          4       0.63           70       dim   clear   \n",
+       "3        highway          4       0.07           35       dim   rainy   \n",
+       "4          rural          1       0.58           60  daylight   foggy   \n",
+       "...          ...        ...        ...          ...       ...     ...   \n",
+       "517749   highway          4       0.10           70  daylight   foggy   \n",
+       "517750     rural          4       0.47           35  daylight   rainy   \n",
+       "517751     urban          4       0.62           25  daylight   foggy   \n",
+       "517752   highway          3       0.63           25     night   clear   \n",
+       "517753   highway          2       0.31           45       dim   rainy   \n",
+       "\n",
+       "        road_signs_present  public_road time_of_day  holiday  school_season  \\\n",
+       "0                    False         True   afternoon    False           True   \n",
+       "1                     True        False     evening     True           True   \n",
+       "2                    False         True     morning     True          False   \n",
+       "3                     True         True     morning    False          False   \n",
+       "4                    False        False     evening     True          False   \n",
+       "...                    ...          ...         ...      ...            ...   \n",
+       "517749                True         True   afternoon    False          False   \n",
+       "517750                True         True     morning    False          False   \n",
+       "517751               False        False   afternoon    False           True   \n",
+       "517752                True        False   afternoon     True           True   \n",
+       "517753               False         True   afternoon     True           True   \n",
+       "\n",
+       "        num_reported_accidents  \n",
+       "0                            1  \n",
+       "1                            0  \n",
+       "2                            2  \n",
+       "3                            1  \n",
+       "4                            1  \n",
+       "...                        ...  \n",
+       "517749                       2  \n",
+       "517750                       1  \n",
+       "517751                       0  \n",
+       "517752                       3  \n",
+       "517753                       2  \n",
+       "\n",
+       "[517754 rows x 12 columns]"
+      ]
+     },
+     "execution_count": 11,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "X"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "89d5ac60",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.940002Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.939806Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.944020Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.943325Z"
+    },
+    "papermill": {
+     "duration": 0.011022,
+     "end_time": "2025-10-18T11:17:00.945044",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.934022",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'accident_risk'"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "nums.pop()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "6b635325",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.956505Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.956315Z",
+     "iopub.status.idle": "2025-10-18T11:17:00.959989Z",
+     "shell.execute_reply": "2025-10-18T11:17:00.959514Z"
+    },
+    "papermill": {
+     "duration": 0.010582,
+     "end_time": "2025-10-18T11:17:00.961039",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.950457",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['num_lanes', 'curvature', 'speed_limit', 'num_reported_accidents']"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "nums"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "42271e09",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:00.972837Z",
+     "iopub.status.busy": "2025-10-18T11:17:00.972614Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.645628Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.644804Z"
+    },
+    "papermill": {
+     "duration": 0.680572,
+     "end_time": "2025-10-18T11:17:01.647203",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:00.966631",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.pipeline import Pipeline\n",
+    "from sklearn.compose import ColumnTransformer\n",
+    "from sklearn.preprocessing import StandardScaler, OrdinalEncoder\n",
+    "\n",
+    "ole = OrdinalEncoder()\n",
+    "scaler = StandardScaler()\n",
+    "\n",
+    "preprocessor = ColumnTransformer([\n",
+    "    ('cat', ole, cats),\n",
+    "    ('num', scaler, ['speed_limit'])\n",
+    "], remainder='passthrough')\n",
+    "\n",
+    "pipe = Pipeline([\n",
+    "    ('preprocessing', preprocessor)\n",
+    "])\n",
+    "pipe.set_output(transform=\"pandas\")\n",
+    "X_processed = pipe.fit_transform(X)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "87a807e9",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.659594Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.659358Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.674457Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.673900Z"
+    },
+    "papermill": {
+     "duration": 0.022266,
+     "end_time": "2025-10-18T11:17:01.675448",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.653182",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>cat__road_type</th>\n",
+       "      <th>cat__lighting</th>\n",
+       "      <th>cat__weather</th>\n",
+       "      <th>cat__road_signs_present</th>\n",
+       "      <th>cat__public_road</th>\n",
+       "      <th>cat__time_of_day</th>\n",
+       "      <th>cat__holiday</th>\n",
+       "      <th>cat__school_season</th>\n",
+       "      <th>num__speed_limit</th>\n",
+       "      <th>remainder__num_lanes</th>\n",
+       "      <th>remainder__curvature</th>\n",
+       "      <th>remainder__num_reported_accidents</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>2.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>-0.703840</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.06</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>2.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>-0.703840</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.99</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.512963</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.63</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>-0.703840</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.07</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.879591</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.58</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5</th>\n",
+       "      <td>0.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.512963</td>\n",
+       "      <td>3</td>\n",
+       "      <td>0.54</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>6</th>\n",
+       "      <td>0.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>-0.070467</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0.04</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7</th>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>-0.070467</td>\n",
+       "      <td>2</td>\n",
+       "      <td>0.33</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>8</th>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>-1.337212</td>\n",
+       "      <td>3</td>\n",
+       "      <td>0.63</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9</th>\n",
+       "      <td>2.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>-0.070467</td>\n",
+       "      <td>4</td>\n",
+       "      <td>0.38</td>\n",
+       "      <td>2</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   cat__road_type  cat__lighting  cat__weather  cat__road_signs_present  \\\n",
+       "0             2.0            0.0           2.0                      0.0   \n",
+       "1             2.0            0.0           0.0                      1.0   \n",
+       "2             1.0            1.0           0.0                      0.0   \n",
+       "3             0.0            1.0           2.0                      1.0   \n",
+       "4             1.0            0.0           1.0                      0.0   \n",
+       "5             0.0            2.0           1.0                      1.0   \n",
+       "6             0.0            2.0           1.0                      0.0   \n",
+       "7             0.0            0.0           0.0                      0.0   \n",
+       "8             1.0            1.0           0.0                      1.0   \n",
+       "9             2.0            1.0           0.0                      1.0   \n",
+       "\n",
+       "   cat__public_road  cat__time_of_day  cat__holiday  cat__school_season  \\\n",
+       "0               1.0               0.0           0.0                 1.0   \n",
+       "1               0.0               1.0           1.0                 1.0   \n",
+       "2               1.0               2.0           1.0                 0.0   \n",
+       "3               1.0               2.0           0.0                 0.0   \n",
+       "4               0.0               1.0           1.0                 0.0   \n",
+       "5               0.0               2.0           0.0                 1.0   \n",
+       "6               1.0               2.0           1.0                 0.0   \n",
+       "7               1.0               1.0           0.0                 1.0   \n",
+       "8               0.0               1.0           1.0                 1.0   \n",
+       "9               1.0               0.0           1.0                 1.0   \n",
+       "\n",
+       "   num__speed_limit  remainder__num_lanes  remainder__curvature  \\\n",
+       "0         -0.703840                     2                  0.06   \n",
+       "1         -0.703840                     4                  0.99   \n",
+       "2          1.512963                     4                  0.63   \n",
+       "3         -0.703840                     4                  0.07   \n",
+       "4          0.879591                     1                  0.58   \n",
+       "5          1.512963                     3                  0.54   \n",
+       "6         -0.070467                     1                  0.04   \n",
+       "7         -0.070467                     2                  0.33   \n",
+       "8         -1.337212                     3                  0.63   \n",
+       "9         -0.070467                     4                  0.38   \n",
+       "\n",
+       "   remainder__num_reported_accidents  \n",
+       "0                                  1  \n",
+       "1                                  0  \n",
+       "2                                  2  \n",
+       "3                                  1  \n",
+       "4                                  1  \n",
+       "5                                  0  \n",
+       "6                                  2  \n",
+       "7                                  0  \n",
+       "8                                  2  \n",
+       "9                                  2  "
+      ]
+     },
+     "execution_count": 15,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "X_processed.head(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "0fc87903",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.687647Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.687442Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.698895Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.698328Z"
+    },
+    "papermill": {
+     "duration": 0.018677,
+     "end_time": "2025-10-18T11:17:01.699934",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.681257",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([1., 0.])"
+      ]
+     },
+     "execution_count": 16,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "X_processed['cat__school_season'].unique()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "6bf1e412",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.712224Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.712034Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.718074Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.717519Z"
+    },
+    "papermill": {
+     "duration": 0.013345,
+     "end_time": "2025-10-18T11:17:01.719084",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.705739",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([ True, False])"
+      ]
+     },
+     "execution_count": 17,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train['school_season'].unique()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "5d257201",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.731463Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.731042Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.734477Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.733958Z"
+    },
+    "papermill": {
+     "duration": 0.010489,
+     "end_time": "2025-10-18T11:17:01.735450",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.724961",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "processed_cats = []\n",
+    "processed_nums = []\n",
+    "\n",
+    "for each in X_processed.columns:\n",
+    "    if 'cat' in each:\n",
+    "        processed_cats.append(each)\n",
+    "    elif 'num' in each or 'remainder' in each:\n",
+    "        processed_nums.append(each)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "3ddad041",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.747474Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.747302Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.751325Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.750648Z"
+    },
+    "papermill": {
+     "duration": 0.011095,
+     "end_time": "2025-10-18T11:17:01.752307",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.741212",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['cat__road_type',\n",
+       " 'cat__lighting',\n",
+       " 'cat__weather',\n",
+       " 'cat__road_signs_present',\n",
+       " 'cat__public_road',\n",
+       " 'cat__time_of_day',\n",
+       " 'cat__holiday',\n",
+       " 'cat__school_season']"
+      ]
+     },
+     "execution_count": 19,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "processed_cats"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "dc134455",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.764824Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.764598Z",
+     "iopub.status.idle": "2025-10-18T11:17:01.768300Z",
+     "shell.execute_reply": "2025-10-18T11:17:01.767799Z"
+    },
+    "papermill": {
+     "duration": 0.01103,
+     "end_time": "2025-10-18T11:17:01.769285",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.758255",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['num__speed_limit',\n",
+       " 'remainder__num_lanes',\n",
+       " 'remainder__curvature',\n",
+       " 'remainder__num_reported_accidents']"
+      ]
+     },
+     "execution_count": 20,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "processed_nums"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "f5a495a9",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:01.782037Z",
+     "iopub.status.busy": "2025-10-18T11:17:01.781830Z",
+     "iopub.status.idle": "2025-10-18T11:17:04.307386Z",
+     "shell.execute_reply": "2025-10-18T11:17:04.306666Z"
+    },
+    "papermill": {
+     "duration": 2.533047,
+     "end_time": "2025-10-18T11:17:04.308581",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:01.775534",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/usr/local/lib/python3.11/dist-packages/keras/src/layers/core/dense.py:87: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.\n",
+      "  super().__init__(activity_regularizer=activity_regularizer, **kwargs)\n",
+      "I0000 00:00:1760786222.916405      19 gpu_device.cc:2022] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 13942 MB memory:  -> device: 0, name: Tesla T4, pci bus id: 0000:00:04.0, compute capability: 7.5\n",
+      "I0000 00:00:1760786222.917073      19 gpu_device.cc:2022] Created device /job:localhost/replica:0/task:0/device:GPU:1 with 13942 MB memory:  -> device: 1, name: Tesla T4, pci bus id: 0000:00:05.0, compute capability: 7.5\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\">Model: \"sequential\"</span>\n",
+       "</pre>\n"
+      ],
+      "text/plain": [
+       "\u001b[1mModel: \"sequential\"\u001b[0m\n"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/html": [
+       "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓\n",
+       "┃<span style=\"font-weight: bold\"> Layer (type)                    </span>┃<span style=\"font-weight: bold\"> Output Shape           </span>┃<span style=\"font-weight: bold\">       Param # </span>┃\n",
+       "┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩\n",
+       "│ dense (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                   │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">384</span>)            │         <span style=\"color: #00af00; text-decoration-color: #00af00\">4,992</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_1 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">192</span>)            │        <span style=\"color: #00af00; text-decoration-color: #00af00\">73,920</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_2 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">96</span>)             │        <span style=\"color: #00af00; text-decoration-color: #00af00\">18,528</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_3 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">72</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">6,984</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_4 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">48</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">3,504</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_5 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">24</span>)             │         <span style=\"color: #00af00; text-decoration-color: #00af00\">1,176</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_6 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">12</span>)             │           <span style=\"color: #00af00; text-decoration-color: #00af00\">300</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_7 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">6</span>)              │            <span style=\"color: #00af00; text-decoration-color: #00af00\">78</span> │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_8 (<span style=\"color: #0087ff; text-decoration-color: #0087ff\">Dense</span>)                 │ (<span style=\"color: #00d7ff; text-decoration-color: #00d7ff\">None</span>, <span style=\"color: #00af00; text-decoration-color: #00af00\">1</span>)              │             <span style=\"color: #00af00; text-decoration-color: #00af00\">7</span> │\n",
+       "└─────────────────────────────────┴────────────────────────┴───────────────┘\n",
+       "</pre>\n"
+      ],
+      "text/plain": [
+       "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓\n",
+       "┃\u001b[1m \u001b[0m\u001b[1mLayer (type)                   \u001b[0m\u001b[1m \u001b[0m┃\u001b[1m \u001b[0m\u001b[1mOutput Shape          \u001b[0m\u001b[1m \u001b[0m┃\u001b[1m \u001b[0m\u001b[1m      Param #\u001b[0m\u001b[1m \u001b[0m┃\n",
+       "┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩\n",
+       "│ dense (\u001b[38;5;33mDense\u001b[0m)                   │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m384\u001b[0m)            │         \u001b[38;5;34m4,992\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_1 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m192\u001b[0m)            │        \u001b[38;5;34m73,920\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_2 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m96\u001b[0m)             │        \u001b[38;5;34m18,528\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_3 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m72\u001b[0m)             │         \u001b[38;5;34m6,984\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_4 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m48\u001b[0m)             │         \u001b[38;5;34m3,504\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_5 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m24\u001b[0m)             │         \u001b[38;5;34m1,176\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_6 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m12\u001b[0m)             │           \u001b[38;5;34m300\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_7 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m6\u001b[0m)              │            \u001b[38;5;34m78\u001b[0m │\n",
+       "├─────────────────────────────────┼────────────────────────┼───────────────┤\n",
+       "│ dense_8 (\u001b[38;5;33mDense\u001b[0m)                 │ (\u001b[38;5;45mNone\u001b[0m, \u001b[38;5;34m1\u001b[0m)              │             \u001b[38;5;34m7\u001b[0m │\n",
+       "└─────────────────────────────────┴────────────────────────┴───────────────┘\n"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/html": [
+       "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Total params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">109,489</span> (427.69 KB)\n",
+       "</pre>\n"
+      ],
+      "text/plain": [
+       "\u001b[1m Total params: \u001b[0m\u001b[38;5;34m109,489\u001b[0m (427.69 KB)\n"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/html": [
+       "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Trainable params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">109,489</span> (427.69 KB)\n",
+       "</pre>\n"
+      ],
+      "text/plain": [
+       "\u001b[1m Trainable params: \u001b[0m\u001b[38;5;34m109,489\u001b[0m (427.69 KB)\n"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/html": [
+       "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><span style=\"font-weight: bold\"> Non-trainable params: </span><span style=\"color: #00af00; text-decoration-color: #00af00\">0</span> (0.00 B)\n",
+       "</pre>\n"
+      ],
+      "text/plain": [
+       "\u001b[1m Non-trainable params: \u001b[0m\u001b[38;5;34m0\u001b[0m (0.00 B)\n"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "from tensorflow.keras.callbacks import EarlyStopping\n",
+    "\n",
+    "earlystop = EarlyStopping(\n",
+    "    monitor='val_loss',\n",
+    "    patience=5,\n",
+    "    restore_best_weights=True\n",
+    ")\n",
+    "\n",
+    "model = Sequential()\n",
+    "\n",
+    "# input layer - 12 inputs\n",
+    "model.add(Dense(384, input_shape=(12,), activation='relu'))\n",
+    "model.add(Dense(192, activation='relu'))\n",
+    "model.add(Dense(96, activation='relu'))\n",
+    "model.add(Dense(72, activation='relu'))\n",
+    "model.add(Dense(48, activation='relu'))\n",
+    "model.add(Dense(24, activation='relu'))\n",
+    "model.add(Dense(12, activation='relu'))\n",
+    "model.add(Dense(6, activation='relu'))\n",
+    "\n",
+    "# output\n",
+    "model.add(Dense(1, activation='linear'))\n",
+    "\n",
+    "model.compile(loss='mse', optimizer='adam', metrics=['mae'])\n",
+    "model.summary()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "31cfbf16",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:04.323006Z",
+     "iopub.status.busy": "2025-10-18T11:17:04.322792Z",
+     "iopub.status.idle": "2025-10-18T11:17:04.521522Z",
+     "shell.execute_reply": "2025-10-18T11:17:04.520711Z"
+    },
+    "papermill": {
+     "duration": 0.207225,
+     "end_time": "2025-10-18T11:17:04.522941",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:04.315716",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import train_test_split\n",
+    "\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X_processed, y, random_state=42, test_size=0.3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "05f03fca",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:04.538861Z",
+     "iopub.status.busy": "2025-10-18T11:17:04.538601Z",
+     "iopub.status.idle": "2025-10-18T11:17:04.543265Z",
+     "shell.execute_reply": "2025-10-18T11:17:04.542587Z"
+    },
+    "papermill": {
+     "duration": 0.013804,
+     "end_time": "2025-10-18T11:17:04.544314",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:04.530510",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "((362427, 12), (155327, 12), (362427,), (155327,))"
+      ]
+     },
+     "execution_count": 23,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "X_train.shape, X_test.shape, y_train.shape, y_test.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "id": "9342e0e2",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:17:04.558479Z",
+     "iopub.status.busy": "2025-10-18T11:17:04.558085Z",
+     "iopub.status.idle": "2025-10-18T11:22:57.941404Z",
+     "shell.execute_reply": "2025-10-18T11:22:57.940632Z"
+    },
+    "papermill": {
+     "duration": 353.627509,
+     "end_time": "2025-10-18T11:22:58.178543",
+     "exception": false,
+     "start_time": "2025-10-18T11:17:04.551034",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Time starts now\n",
+      "Epoch 1/100\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR\n",
+      "I0000 00:00:1760786227.899404      62 service.cc:148] XLA service 0x7dac88010260 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:\n",
+      "I0000 00:00:1760786227.900211      62 service.cc:156]   StreamExecutor device (0): Tesla T4, Compute Capability 7.5\n",
+      "I0000 00:00:1760786227.900229      62 service.cc:156]   StreamExecutor device (1): Tesla T4, Compute Capability 7.5\n",
+      "I0000 00:00:1760786228.302592      62 cuda_dnn.cc:529] Loaded cuDNN version 90300\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1m   68/11326\u001b[0m \u001b[37m━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[1m25s\u001b[0m 2ms/step - loss: 0.0699 - mae: 0.2004"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "I0000 00:00:1760786229.896111      62 device_compiler.h:188] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m42s\u001b[0m 3ms/step - loss: 0.0056 - mae: 0.0545 - val_loss: 0.0037 - val_mae: 0.0472\n",
+      "Epoch 2/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m35s\u001b[0m 3ms/step - loss: 0.0035 - mae: 0.0457 - val_loss: 0.0034 - val_mae: 0.0453\n",
+      "Epoch 3/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m35s\u001b[0m 3ms/step - loss: 0.0034 - mae: 0.0453 - val_loss: 0.0034 - val_mae: 0.0451\n",
+      "Epoch 4/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0450 - val_loss: 0.0035 - val_mae: 0.0461\n",
+      "Epoch 5/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0449 - val_loss: 0.0033 - val_mae: 0.0446\n",
+      "Epoch 6/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m35s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0448 - val_loss: 0.0033 - val_mae: 0.0446\n",
+      "Epoch 7/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0447 - val_loss: 0.0033 - val_mae: 0.0448\n",
+      "Epoch 8/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m35s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0445 - val_loss: 0.0033 - val_mae: 0.0447\n",
+      "Epoch 9/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m35s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0445 - val_loss: 0.0035 - val_mae: 0.0455\n",
+      "Epoch 10/100\n",
+      "\u001b[1m11326/11326\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m34s\u001b[0m 3ms/step - loss: 0.0033 - mae: 0.0446 - val_loss: 0.0033 - val_mae: 0.0447\n",
+      "Ends after 353.3789482116699s\n"
+     ]
+    }
+   ],
+   "source": [
+    "import time\n",
+    "\n",
+    "print(\"Time starts now\")\n",
+    "start = time.time()\n",
+    "\n",
+    "history = model.fit(\n",
+    "    X_train, y_train,\n",
+    "    validation_data=(X_test, y_test),\n",
+    "    epochs=100,\n",
+    "    batch_size=32,\n",
+    "    callbacks=earlystop\n",
+    ")\n",
+    "\n",
+    "print(f\"Ends after {time.time() - start}s\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "id": "f052ee14",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:22:58.581353Z",
+     "iopub.status.busy": "2025-10-18T11:22:58.581074Z",
+     "iopub.status.idle": "2025-10-18T11:22:58.765770Z",
+     "shell.execute_reply": "2025-10-18T11:22:58.764958Z"
+    },
+    "papermill": {
+     "duration": 0.387478,
+     "end_time": "2025-10-18T11:22:58.767213",
+     "exception": false,
+     "start_time": "2025-10-18T11:22:58.379735",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "test_processed = pipe.fit_transform(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "7eecbd10",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:22:59.172461Z",
+     "iopub.status.busy": "2025-10-18T11:22:59.171712Z",
+     "iopub.status.idle": "2025-10-18T11:23:09.656348Z",
+     "shell.execute_reply": "2025-10-18T11:23:09.655550Z"
+    },
+    "papermill": {
+     "duration": 10.686827,
+     "end_time": "2025-10-18T11:23:09.657710",
+     "exception": false,
+     "start_time": "2025-10-18T11:22:58.970883",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1m5394/5394\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m8s\u001b[0m 1ms/step\n"
+     ]
+    }
+   ],
+   "source": [
+    "preds = model.predict(test_processed)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "eaa6f117",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:10.128575Z",
+     "iopub.status.busy": "2025-10-18T11:23:10.128293Z",
+     "iopub.status.idle": "2025-10-18T11:23:10.133296Z",
+     "shell.execute_reply": "2025-10-18T11:23:10.132556Z"
+    },
+    "papermill": {
+     "duration": 0.262633,
+     "end_time": "2025-10-18T11:23:10.134484",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:09.871851",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "172585"
+      ]
+     },
+     "execution_count": 27,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "test_processed.shape[0]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "36103eb1",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:10.549017Z",
+     "iopub.status.busy": "2025-10-18T11:23:10.548779Z",
+     "iopub.status.idle": "2025-10-18T11:23:10.602923Z",
+     "shell.execute_reply": "2025-10-18T11:23:10.602322Z"
+    },
+    "papermill": {
+     "duration": 0.26168,
+     "end_time": "2025-10-18T11:23:10.604010",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:10.342330",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "pred_list = []\n",
+    "for i in range(172585):\n",
+    "    pred_list.append(preds[i][0])\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "id": "94df38ea",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:11.018052Z",
+     "iopub.status.busy": "2025-10-18T11:23:11.017488Z",
+     "iopub.status.idle": "2025-10-18T11:23:20.001216Z",
+     "shell.execute_reply": "2025-10-18T11:23:20.000572Z"
+    },
+    "papermill": {
+     "duration": 9.18978,
+     "end_time": "2025-10-18T11:23:20.002575",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:10.812795",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[1m4854/4854\u001b[0m \u001b[32m━━━━━━━━━━━━━━━━━━━━\u001b[0m\u001b[37m\u001b[0m \u001b[1m6s\u001b[0m 1ms/step\n"
+     ]
+    }
+   ],
+   "source": [
+    "y_pred = model.predict(X_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "id": "941cd7f0",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:20.425854Z",
+     "iopub.status.busy": "2025-10-18T11:23:20.425565Z",
+     "iopub.status.idle": "2025-10-18T11:23:20.435462Z",
+     "shell.execute_reply": "2025-10-18T11:23:20.434792Z"
+    },
+    "papermill": {
+     "duration": 0.221137,
+     "end_time": "2025-10-18T11:23:20.436602",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:20.215465",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.8807101417579318"
+      ]
+     },
+     "execution_count": 30,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from sklearn.metrics import r2_score\n",
+    "r2_score(y_test, y_pred)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "id": "8dba143a",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:20.913522Z",
+     "iopub.status.busy": "2025-10-18T11:23:20.912896Z",
+     "iopub.status.idle": "2025-10-18T11:23:20.929636Z",
+     "shell.execute_reply": "2025-10-18T11:23:20.929024Z"
+    },
+    "papermill": {
+     "duration": 0.232039,
+     "end_time": "2025-10-18T11:23:20.930694",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:20.698655",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "ids = list(test_id)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "id": "584fb571",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:21.353124Z",
+     "iopub.status.busy": "2025-10-18T11:23:21.352446Z",
+     "iopub.status.idle": "2025-10-18T11:23:21.356095Z",
+     "shell.execute_reply": "2025-10-18T11:23:21.355396Z"
+    },
+    "papermill": {
+     "duration": 0.216628,
+     "end_time": "2025-10-18T11:23:21.357250",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:21.140622",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "submission = {\n",
+    "    'id' : ids,\n",
+    "    'accident_risk': pred_list\n",
+    "}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "id": "fe4e71c8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:21.827714Z",
+     "iopub.status.busy": "2025-10-18T11:23:21.827444Z",
+     "iopub.status.idle": "2025-10-18T11:23:21.902731Z",
+     "shell.execute_reply": "2025-10-18T11:23:21.901969Z"
+    },
+    "papermill": {
+     "duration": 0.289045,
+     "end_time": "2025-10-18T11:23:21.904087",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:21.615042",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "my_submission = pd.DataFrame(submission)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "id": "2b4e58a0",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:22.348235Z",
+     "iopub.status.busy": "2025-10-18T11:23:22.347968Z",
+     "iopub.status.idle": "2025-10-18T11:23:22.591726Z",
+     "shell.execute_reply": "2025-10-18T11:23:22.590941Z"
+    },
+    "papermill": {
+     "duration": 0.465784,
+     "end_time": "2025-10-18T11:23:22.593203",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:22.127419",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "my_submission.to_csv(\"submission.csv\", index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "id": "98bf582e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:23.050515Z",
+     "iopub.status.busy": "2025-10-18T11:23:23.050237Z",
+     "iopub.status.idle": "2025-10-18T11:23:23.122432Z",
+     "shell.execute_reply": "2025-10-18T11:23:23.121904Z"
+    },
+    "papermill": {
+     "duration": 0.311038,
+     "end_time": "2025-10-18T11:23:23.123581",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:22.812543",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "model.save('road_prediction.keras')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "id": "12518ae4",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2025-10-18T11:23:23.591337Z",
+     "iopub.status.busy": "2025-10-18T11:23:23.590591Z",
+     "iopub.status.idle": "2025-10-18T11:23:23.598070Z",
+     "shell.execute_reply": "2025-10-18T11:23:23.597481Z"
+    },
+    "papermill": {
+     "duration": 0.219744,
+     "end_time": "2025-10-18T11:23:23.599032",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:23.379288",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['pipeline.pkl']"
+      ]
+     },
+     "execution_count": 36,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import joblib\n",
+    "joblib.dump(pipe, 'pipeline.pkl')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "abb925a7",
+   "metadata": {
+    "papermill": {
+     "duration": 0.209459,
+     "end_time": "2025-10-18T11:23:24.019191",
+     "exception": false,
+     "start_time": "2025-10-18T11:23:23.809732",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "nvidiaTeslaT4",
+   "dataSources": [
+    {
+     "databundleVersionId": 13760552,
+     "sourceId": 91721,
+     "sourceType": "competition"
+    }
+   ],
+   "dockerImageVersionId": 31090,
+   "isGpuEnabled": true,
+   "isInternetEnabled": true,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.13"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 409.583527,
+   "end_time": "2025-10-18T11:23:27.809351",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2025-10-18T11:16:38.225824",
+   "version": "2.6.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
